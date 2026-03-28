@@ -14,6 +14,7 @@ Run with:
 """
 
 import asyncio
+import logging
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -26,17 +27,24 @@ from fastapi.templating import Jinja2Templates
 from config.settings import settings
 from signals.engine import SignalEngine, Signal
 
+logger = logging.getLogger(__name__)
+
 # ── Global state ──────────────────────────────────────────────────────────────
 
 engine: Optional[SignalEngine] = None
 engine_task: Optional[asyncio.Task] = None
+engine_error: Optional[str] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global engine, engine_task
-    engine = SignalEngine()
-    engine_task = asyncio.create_task(engine.run())
+    global engine, engine_task, engine_error
+    try:
+        engine = SignalEngine()
+        engine_task = asyncio.create_task(engine.run())
+    except Exception as exc:
+        engine_error = str(exc)
+        logger.error("Signal engine failed to start: %s", exc)
     yield
     if engine_task:
         engine_task.cancel()
@@ -51,6 +59,12 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
 # ── API Routes ────────────────────────────────────────────────────────────────
+
+@app.get("/health")
+async def health():
+    """Liveness probe — always 200 as long as the process is running."""
+    return {"status": "ok", "engine": "running" if engine else "not started", "error": engine_error}
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
