@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Polymarket Alpha</title>
+<style>
+  :root {
+    --bg: #0f1117; --bg2: #1a1d27; --bg3: #23263a;
+    --text: #e2e8f0; --muted: #94a3b8; --border: #2d3148;
+    --green: #22c55e; --red: #ef4444; --amber: #f59e0b;
+    --blue: #3b82f6; --purple: #8b5cf6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; font-size: 14px; }
+
+  header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.4 } }
+
+  .layout { display: grid; grid-template-columns: 280px 1fr; height: calc(100vh - 57px); }
+
+  /* Sidebar */
+  aside { background: var(--bg2); border-right: 1px solid var(--border); padding: 20px; overflow-y: auto; }
+  aside h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 16px; }
+
+  .strategy-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
+  .strategy-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .strategy-name { font-weight: 500; font-size: 13px; }
+  .strategy-desc { color: var(--muted); font-size: 11px; line-height: 1.5; margin-bottom: 10px; }
+  .strategy-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 500; }
+  .pill-cost { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .pill-free { background: rgba(34,197,94,0.12); color: var(--green); }
+  .pill-weight { background: rgba(59,130,246,0.15); color: var(--blue); }
+
+  /* Toggle */
+  .toggle { position: relative; width: 36px; height: 20px; cursor: pointer; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-track { position: absolute; inset: 0; background: var(--border); border-radius: 20px; transition: background 0.2s; }
+  .toggle input:checked + .toggle-track { background: var(--blue); }
+  .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; background: white; border-radius: 50%; transition: transform 0.2s; }
+  .toggle input:checked ~ .toggle-thumb { transform: translateX(16px); }
+
+  /* Main */
+  main { overflow-y: auto; padding: 20px; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .toolbar h2 { font-size: 13px; font-weight: 500; }
+  .filter-row { display: flex; gap: 8px; }
+  .btn { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+  .btn:hover { border-color: var(--blue); }
+  .btn.active { background: var(--blue); border-color: var(--blue); color: white; }
+
+  /* Signal table */
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; padding: 8px 12px; border-bottom: 1px solid var(--border); font-weight: 500; }
+  td { padding: 12px 12px; border-bottom: 1px solid rgba(45,49,72,0.5); vertical-align: top; }
+  tr:hover td { background: var(--bg2); cursor: pointer; }
+
+  .question-cell { max-width: 320px; }
+  .question-text { font-size: 13px; line-height: 1.4; margin-bottom: 4px; }
+  .market-id { font-size: 10px; color: var(--muted); font-family: monospace; }
+
+  .price-cell { text-align: right; font-family: monospace; font-size: 13px; }
+  .edge-positive { color: var(--green); font-weight: 600; }
+  .edge-negative { color: var(--red); font-weight: 600; }
+
+  .side-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .side-yes { background: rgba(34,197,94,0.15); color: var(--green); }
+  .side-no { background: rgba(239,68,68,0.15); color: var(--red); }
+
+  .strategy-dots { display: flex; gap: 4px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot-rc { background: var(--purple); }
+  .dot-br { background: var(--amber); }
+  .dot-la { background: var(--blue); }
+  .dot-off { background: var(--border); }
+
+  /* Detail panel */
+  .detail-panel { display: none; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-top: 8px; }
+  .detail-panel.open { display: block; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 12px; }
+  .detail-col { background: var(--bg3); border-radius: 8px; padding: 14px; }
+  .detail-col h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 10px; }
+  .detail-col .delta { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .detail-col .detail-status { font-size: 11px; color: var(--muted); }
+  .disabled-overlay { color: var(--muted); font-size: 12px; opacity: 0.6; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty-state p { margin-top: 8px; font-size: 13px; }
+
+  .tag-row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  .tag { font-size: 10px; padding: 2px 6px; background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; color: var(--muted); }
+
+  #status-bar { background: var(--bg2); border-top: 1px solid var(--border); padding: 8px 24px; font-size: 11px; color: var(--muted); display: flex; gap: 20px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Polymarket Alpha</h1>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div class="live-dot"></div>
+    <span style="color:var(--muted);font-size:12px" id="last-update">Connecting...</span>
+  </div>
+</header>
+
+<div class="layout">
+  <aside>
+    <h2>Strategies</h2>
+
+    <div class="strategy-card" id="card-rc">
+      <div class="strategy-header">
+        <span class="strategy-name">Resolution Criteria</span>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-rc" onchange="toggleStrategy('resolution_criteria', this.checked)" {% if strategies.resolution_criteria %}checked{% endif %}>
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb"></span>
+        </label>
+      </div>
+      <div class="strategy-desc">Claude parses exact resolution conditions. Finds where traders misread the literal criteria vs market intent.</div>
+      <div class="strategy-meta">
+        <span class="pill pill-cost">Anthropic API cost</span>
+        <span class="pill pill-weight" id="weight-rc">Weight: {{ "%.0f"|format(weights.get('resolution_criteria', 0) * 100) }}%</span>
+      </div>
+    </div>
+
+    <div class="strategy-card" id="card-br">
+      <div class="strategy-header">
+        <span class="strategy-name">Base Rates</span>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-br" onchange="toggleStrategy('base_rates', this.checked)" {% if strategies.base_rates %}checked{% endif %}>
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb"></span>
+        </label>
+      </div>
+      <div class="strategy-desc">Compares market price to historical frequencies for elections, FDA approvals, macro events, etc.</div>
+      <div class="strategy-meta">
+        <span class="pill pill-free">Free — DB lookup</span>
+        <span class="pill pill-weight" id="weight-br">Weight: {{ "%.0f"|format(weights.get('base_rates', 0) * 100) }}%</span>
+      </div>
+    </div>
+
+    <div class="strategy-card" id="card-la">
+      <div class="strategy-header">
+        <span class="strategy-name">Latency Arb</span>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-la" onchange="toggleStrategy('latency_arb', this.checked)" {% if strategies.latency_arb %}checked{% endif %}>
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb"></span>
+        </label>
+      </div>
+      <div class="strategy-desc">Monitors Metaculus, Manifold, and Kalshi for price discrepancies vs Polymarket.</div>
+      <div class="strategy-meta">
+        <span class="pill pill-free">Rate-limited polling</span>
+        <span class="pill pill-weight" id="weight-la">Weight: {{ "%.0f"|format(weights.get('latency_arb', 0) * 100) }}%</span>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+      <h2 style="margin-bottom:10px">Legend</h2>
+      <div style="display:flex;flex-direction:column;gap:6px;font-size:11px;color:var(--muted)">
+        <div style="display:flex;align-items:center;gap:8px"><span class="dot dot-rc"></span> Resolution Criteria</div>
+        <div style="display:flex;align-items:center;gap:8px"><span class="dot dot-br"></span> Base Rates</div>
+        <div style="display:flex;align-items:center;gap:8px"><span class="dot dot-la"></span> Latency Arb</div>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="toolbar">
+      <h2 id="signal-count">Loading signals...</h2>
+      <div class="filter-row">
+        <button class="btn active" id="btn-sig" onclick="setFilter('significant')">Significant only</button>
+        <button class="btn" id="btn-all" onclick="setFilter('all')">All markets</button>
+        <button class="btn" onclick="refresh()">↻ Refresh</button>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Market</th>
+          <th>Market price</th>
+          <th>Fair value</th>
+          <th>Edge</th>
+          <th>Side</th>
+          <th>Kelly $</th>
+          <th>Strategies</th>
+        </tr>
+      </thead>
+      <tbody id="signal-body">
+        <tr><td colspan="7"><div class="empty-state">Loading...</div></td></tr>
+      </tbody>
+    </table>
+  </main>
+</div>
+
+<div id="status-bar">
+  <span id="sb-strategies">Active strategies: —</span>
+  <span id="sb-signals">Signals: —</span>
+  <span id="sb-ts">Last update: —</span>
+</div>
+
+<script>
+let currentFilter = 'significant';
+let expandedMarket = null;
+
+async function toggleStrategy(name, enabled) {
+  const resp = await fetch('/api/strategies/toggle', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ strategy: name, enabled }),
+  });
+  const data = await resp.json();
+  updateWeightLabels(data.weights);
+  await refresh();
+}
+
+function updateWeightLabels(weights) {
+  const fmt = (v) => v ? Math.round(v * 100) + '%' : '0%';
+  document.getElementById('weight-rc').textContent = 'Weight: ' + fmt(weights.resolution_criteria);
+  document.getElementById('weight-br').textContent = 'Weight: ' + fmt(weights.base_rates);
+  document.getElementById('weight-la').textContent = 'Weight: ' + fmt(weights.latency_arb);
+}
+
+function setFilter(f) {
+  currentFilter = f;
+  document.getElementById('btn-sig').classList.toggle('active', f === 'significant');
+  document.getElementById('btn-all').classList.toggle('active', f === 'all');
+  refresh();
+}
+
+async function refresh() {
+  const onlySig = currentFilter === 'significant';
+  const resp = await fetch(`/api/signals?only_significant=${onlySig}&limit=100`);
+  const data = await resp.json();
+  renderSignals(data);
+}
+
+function renderSignals(data) {
+  const tbody = document.getElementById('signal-body');
+  const signals = data.signals || [];
+
+  document.getElementById('signal-count').textContent =
+    signals.length + ' signal' + (signals.length !== 1 ? 's' : '');
+  document.getElementById('sb-strategies').textContent =
+    'Active strategies: ' + (data.active_strategies || []).join(', ') || 'none';
+  document.getElementById('sb-signals').textContent = 'Signals: ' + signals.length;
+  document.getElementById('sb-ts').textContent =
+    'Last update: ' + new Date().toLocaleTimeString();
+  document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+
+  if (signals.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">
+      <div style="font-size:24px">○</div>
+      <p>No ${currentFilter === 'significant' ? 'significant' : ''} signals at the moment.</p>
+    </div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = signals.map(s => {
+    const edge = s.edge;
+    const edgeStr = edge != null ? (edge >= 0 ? '+' : '') + (edge * 100).toFixed(1) + 'pp' : '—';
+    const edgeClass = edge > 0 ? 'edge-positive' : edge < 0 ? 'edge-negative' : '';
+    const fv = s.fair_value != null ? (s.fair_value * 100).toFixed(1) + '%' : '—';
+    const mp = s.market_price != null ? (s.market_price * 100).toFixed(1) + '%' : '—';
+    const kelly = s.kelly_position_usd != null ? '$' + s.kelly_position_usd.toFixed(0) : '—';
+
+    const strats = s.strategies || {};
+    const dots = `
+      <div class="strategy-dots">
+        <div class="dot ${strats.resolution_criteria?.ran ? 'dot-rc' : 'dot-off'}" title="Resolution criteria"></div>
+        <div class="dot ${strats.base_rates?.ran ? 'dot-br' : 'dot-off'}" title="Base rates"></div>
+        <div class="dot ${strats.latency_arb?.ran ? 'dot-la' : 'dot-off'}" title="Latency arb"></div>
+      </div>`;
+
+    const sideBadge = s.recommended_side
+      ? `<span class="side-badge side-${s.recommended_side.toLowerCase()}">${s.recommended_side}</span>`
+      : '<span style="color:var(--muted)">—</span>';
+
+    return `<tr onclick="toggleDetail('${s.market_id}')">
+      <td class="question-cell">
+        <div class="question-text">${s.question}</div>
+        <div class="market-id">${s.market_id.slice(0, 12)}...</div>
+      </td>
+      <td class="price-cell">${mp}</td>
+      <td class="price-cell">${fv}</td>
+      <td class="price-cell"><span class="${edgeClass}">${edgeStr}</span></td>
+      <td>${sideBadge}</td>
+      <td class="price-cell">${kelly}</td>
+      <td>${dots}</td>
+    </tr>
+    <tr id="detail-${s.market_id}" style="display:none">
+      <td colspan="7">
+        <div class="detail-panel open">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px">${s.summary}</div>
+          <div class="detail-grid">
+            ${renderStrategyCol('Resolution Criteria', strats.resolution_criteria, 'dot-rc')}
+            ${renderStrategyCol('Base Rates', strats.base_rates, 'dot-br')}
+            ${renderStrategyCol('Latency Arb', strats.latency_arb, 'dot-la')}
+          </div>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderStrategyCol(name, contrib, dotClass) {
+  if (!contrib) return `<div class="detail-col"><h4>${name}</h4><div class="disabled-overlay">No data</div></div>`;
+  if (!contrib.enabled) return `<div class="detail-col"><h4>${name}</h4><div class="disabled-overlay">Disabled</div></div>`;
+  if (!contrib.ran) return `<div class="detail-col"><h4>${name}</h4><div class="disabled-overlay">${contrib.error || 'No match'}</div></div>`;
+
+  const delta = contrib.fair_value_delta;
+  const deltaStr = delta != null ? (delta >= 0 ? '+' : '') + (delta * 100).toFixed(1) + 'pp' : '—';
+  const deltaClass = delta > 0 ? 'edge-positive' : delta < 0 ? 'edge-negative' : '';
+
+  return `<div class="detail-col">
+    <h4><span class="dot ${dotClass}" style="display:inline-block;margin-right:6px"></span>${name}</h4>
+    <div class="delta ${deltaClass}">${deltaStr}</div>
+    <div class="detail-status">Fair value adjustment</div>
+  </div>`;
+}
+
+function toggleDetail(marketId) {
+  const row = document.getElementById('detail-' + marketId);
+  if (!row) return;
+  const isOpen = row.style.display !== 'none';
+  // Close all
+  document.querySelectorAll('[id^="detail-"]').forEach(r => r.style.display = 'none');
+  if (!isOpen) row.style.display = '';
+}
+
+// Auto-refresh every 15 seconds
+refresh();
+setInterval(refresh, 15000);
+</script>
+</body>
+</html>
