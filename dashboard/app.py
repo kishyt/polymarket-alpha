@@ -16,6 +16,7 @@ Run with:
 import asyncio
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, Request
@@ -46,7 +47,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-templates = Jinja2Templates(directory="dashboard/templates")
+templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
 # ── API Routes ────────────────────────────────────────────────────────────────
