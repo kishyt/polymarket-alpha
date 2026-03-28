@@ -23,7 +23,7 @@ apscheduler==3.10.4
 structlog==24.4.0
 
 # Polymarket order signing (for execution layer)
-py-clob-client==0.20.0
+# py-clob-client==0.20.0  — uncomment when execution layer is implemented
 
 # Testing
 pytest==8.3.3
